@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<script>
+String.prototype.replaceAll = function(search, replacement) {
+    var target = this;
+    return target.replace(new RegExp(search, 'g'), replacement);
+};
+function generateInterface(){
+    try{
+            var json_data=document.getElementById('abitext').value
+            var data=JSON.parse(json_data)
+            var address=document.getElementById('contract').value
+            template0=
+`
+abiDefinition=%ABI%
+contractAddress="%ADDRESS%"
+%FUNCTIONS%
+`
+template=
+`
+function %NAME%(%PARAMS%callback){
+    var contractAbi = web3.eth.contract(abiDefinition);
+    var myContract = contractAbi.at(contractAddress);
+    var outputData = myContract.%NAME%.getData(%PARAMS2%);
+    var endstr=web3.eth.%TRANSACT%({to:contractAddress, from:null, data: outputData%VALUE%},
+    function(error,result){
+        if(!error){
+            console.log('%NAME% ',%CONVERSION%);
+            callback(%CONVERSION%)
+        }
+        else{
+            console.log('transaction failed with ',error.message)
+        }
+    });
+}
+`;
+            console.log('abiandcontract '+data+' '+contract)
+            functions=''
+            for(f of data){
+                console.log('processing part of data:',f)
+                if(f['name']){
+                    console.log('testing iteration '+f['name'])
+                    params=''
+                    ftext=template
+                    if (f['inputs']){
+                        for (input of f['inputs']){
+                            if (input['name'].length>0){
+                                params+=input['name']+','
+                            }
+                        }
+                    }
+                    params2=params.substring(0,params.length-1)//[:-1]
+                    callback='result'
+                    if (f['outputs']!=null && f['outputs'].length>0){
+                        callback='result'
+                        console.log('outputs: ',f['outputs'])
+                        if(f['outputs'][0]['type'].indexOf('uint')!=-1){
+                            callback='web3.toDecimal(result)'
+                        }
+                        if (f['outputs'][0]['type'].indexOf('string')!=-1){
+                            callback='web3.toAscii(result)'
+                        }
+                    }
+                    value=''
+                    console.log('checking function ',f)
+                    if (f['payable']==null){
+                        continue
+                    }
+                    console.log('payable is: ',f['payable'])
+                    if (f['payable']){
+                        value=',value: eth'
+                        params+='eth,'
+                    }
+                    transact='call'
+                    if(!f['constant']){
+                        transact='sendTransaction'
+                    }
+                    ftext=ftext.replaceAll('%TRANSACT%',transact)
+                    ftext=ftext.replaceAll('%VALUE%',value)
+                    ftext=ftext.replaceAll('%CONVERSION%',callback)
+                    ftext=ftext.replaceAll('%PARAMS%',params)
+                    ftext=ftext.replaceAll('%PARAMS2%',params2)
+                    ftext=ftext.replaceAll('%NAME%',f['name'])
+                    functions+=ftext+'\n'
+                }
+            }
+                    
+            finalstr=template0.replaceAll('%ADDRESS%',address).replaceAll('%ABI%',json_data).replaceAll('%FUNCTIONS%',functions)
+            document.getElementById('result').value=finalstr
+            document.getElementById('result').style.display="inline-block"
+        }
+        catch(err){
+            document.getElementById("result").innerHTML=err.message;
+            document.getElementById('result').style.display="inline-block"
+            return;
+        }
+        document.getElementById("result").select();
+        document.execCommand("copy");
+}
+</script>
+<body>
+
+<h2>Ethereum Contract Interface Generator</h2>
+<p>Generate a javascript interface for your Ethereum DApp!</p>
+<textarea placeholder="ABI" id="abitext" rows="4" cols="50">
+</textarea>
+<br>
+<input type="text" placeholder="contract address" id="contract" >
+<br><br>
+<button type="button"
+onclick="generateInterface()">
+Generate </button>
+<br><br>
+<textarea style="display:none;" id="result" placeholder="Interface"  rows="52" cols="90" readonly="readonly" >
+</textarea>
+<p id="demo"></p>
+
+</body>
+</html> 
